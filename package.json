@@ -1,0 +1,27 @@
+{
+  "name": "perceptron",
+  "version": "0.0.1",
+  "description": "A simple perceptron written in Javascript",
+  "main": "perceptron.js",
+  "scripts": {
+    "test": "node tests/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chesles/perceptron.git"
+  },
+  "author": "chesles <john@chesl.es>",
+  "license": "MIT",
+  "readmeFilename": "README.md",
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "specify": "~1.1.2"
+  },
+  "keywords": [
+    "machine learning",
+    "perceptron"
+  ]
+}
