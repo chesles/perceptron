@@ -18,7 +18,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "specify": "~1.1.2"
+    "specify": "*"
   },
   "keywords": [
     "machine learning",
