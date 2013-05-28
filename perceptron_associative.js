@@ -115,7 +115,6 @@ function PerceptronAssociative(opts) {
 
 
 		adjust: function(result, expected, input, feature) {
-			if (!input) throw new Error('input is undefined! result='+result+" expected="+expected+" feature="+feature);
 			var delta = api.delta(result, expected, input, learningrate);
 			if (isNaN(delta)) throw new Error('delta is NaN!! result='+result+" expected="+expected+" input="+input+" feature="+feature);
 			weights[feature] += delta;
@@ -142,7 +141,7 @@ function PerceptronAssociative(opts) {
 				}
 			}
 			result += threshold * weights['threshold']
-			if (debug) console.log("perceive_features ",inputs," = ",result);
+			if (debug) console.log("> perceive_features ",inputs," = ",result);
 			return net
 				? result
 				: result > 0 ? 1 : 0

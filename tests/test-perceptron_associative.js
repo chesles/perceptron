@@ -4,7 +4,8 @@ var specify = require('specify')
 specify('basic training', function(test) {
   var opts = {
     weights: {'a': 0, 'b': 0, 'c': 0, 'threshold': 0},
-    learningrate: 1
+    learningrate: 1,
+    debug:0
   }
   var p = perceptron(opts)
 
