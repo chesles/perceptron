@@ -1,3 +1,4 @@
+
 /**
  * A version of Perceptron where the weights vector is an associative array (not a numeric array), 
  * so the features can be any objects (not just nubmers).
@@ -38,7 +39,9 @@ function PerceptronAssociative(opts) {
 		: 0.1
 	var feature_extractor = 'feature_extractor' in opts
 		? opts.feature_extractor
-		: undefined;
+		: 0;
+
+	var fs = require('fs'), mkpath = require('mkpath');
 
 	/**
 	 * Keep track of ALL training samples, their perceived values and their correct (target) values. 
@@ -47,7 +50,32 @@ function PerceptronAssociative(opts) {
 
 	var api = {
 		weights: weights,
-		
+
+		save: function(folder) {
+			mkpath.sync(folder);
+			fs.writeFileSync(folder+"/opts.json", "{\n"+
+				'"weights": '+JSON.stringify(weights)+",\n"+
+				'"default_weight": '+default_weight+",\n"+
+				'"threshold": '+threshold+",\n"+ 
+				'"learningrate": '+learningrate+",\n"+ 
+				'"debug": '+debug+",\n"+ 
+				'"feature_extractor": '+feature_extractor+"\n"+
+				"}\n"
+			);
+			fs.writeFileSync(folder+"/data.json", JSON.stringify(data));
+		},
+
+		load: function(folder) {
+			data = JSON.parse(fs.readFileSync(folder+"/data.json"));
+			opts = JSON.parse(fs.readFileSync(folder+"/opts.json"));
+			api.weights = weights = opts.weights;
+			default_weight = opts.default_weight;
+			threshold = opts.threshold;
+			learningrate = opts.learningrate;
+			debug = opts.debug;
+			feature_extractor = opts.feature_extractor;
+		},
+
 		/**
 		 * Run through all past training samples, and use them for training once more.
 		 * @return true if ALL samples got their correct classification (i.e. no change made).
@@ -61,7 +89,34 @@ function PerceptronAssociative(opts) {
 			}
 			return success
 		},
-		
+
+		/**
+		 * Run through all past training samples, and use them for testing.
+		 * @return .
+		 */
+		testOnTrainingData: function() {
+			var length = data.length
+			var TP=0, FP=0, TN=0, FN=0;
+			for (var i=0; i<length; i++) {
+				var training = data[i];
+				var expected = training.target;
+				var actual = api.perceive_features(training.input);
+				if (expected && actual) TP++;
+				if (!expected && actual) FP++;
+				if (expected && !actual) FN++;
+				if (!expected && !actual) TN++;
+			}
+			return {
+				TP: TP,
+				FP: FP,
+				TN: TN,
+				FN: FN,
+				Accuracy:  (TP+TN)/length,
+				Precision: TP/(TP+FP),
+				Recall:    TP/(TP+FN),
+			};
+		},
+
 		/**
 		 * @param inputs a SINGLE training sample; an associative array (feature => value).
 		 * @param expected the classification value for that sample (0 or 1)
@@ -80,7 +135,7 @@ function PerceptronAssociative(opts) {
 			}
 
 			var result = api.perceive_features(inputs)
-			data.push({input: inputs, target: expected, prev: result})
+			data.push({input: inputs, target: expected/*, prev: result*/})
 
 			if (debug) console.log('> training ',inputs,', expecting: ',expected, ' got: ', result)
 
@@ -97,7 +152,6 @@ function PerceptronAssociative(opts) {
 			}
 		},
 
-		
 		/**
 		 * @param inputs a SINGLE training sample; converted to a feature array with feature_extractor (if available).
 		 * @param expected the classification value for that sample (0 or 1)
