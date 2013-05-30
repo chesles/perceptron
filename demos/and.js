@@ -1,3 +1,7 @@
+/**
+ * A perceptron that calculates the boolean "and" function
+ */
+
 var perceptron = require('../perceptron')
 
 var and = perceptron()

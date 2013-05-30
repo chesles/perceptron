@@ -53,16 +53,16 @@ function PerceptronAssociative(opts) {
 
 		save: function(folder) {
 			mkpath.sync(folder);
-			fs.writeFileSync(folder+"/opts.json", "{\n"+
-				'"weights": '+JSON.stringify(weights)+",\n"+
-				'"default_weight": '+default_weight+",\n"+
-				'"threshold": '+threshold+",\n"+ 
-				'"learningrate": '+learningrate+",\n"+ 
-				'"debug": '+debug+",\n"+ 
-				'"feature_extractor": '+feature_extractor+"\n"+
-				"}\n"
+			fs.writeFileSync(folder+"/opts.json", JSON.stringify({
+					weights: weights,
+					default_weight: default_weight,
+					threshold: threshold, 
+					learningrate: learningrate, 
+					debug: debug, 
+					feature_extractor: feature_extractor
+				},null,"\t")
 			);
-			fs.writeFileSync(folder+"/data.json", JSON.stringify(data));
+			fs.writeFileSync(folder+"/data.json", JSON.stringify(data,null,"\t"));
 		},
 
 		load: function(folder) {
@@ -84,37 +84,10 @@ function PerceptronAssociative(opts) {
 			var length = data.length
 			var success = true
 			for(var i=0; i<length; i++) {
-				var training = data.shift()
-				success = api.train_features(training.input, training.target) && success
+				var sample = data.shift();
+				success = api.train_features(sample.features, sample.classification) && success
 			}
-			return success
-		},
-
-		/**
-		 * Run through all past training samples, and use them for testing.
-		 * @return .
-		 */
-		testOnTrainingData: function() {
-			var length = data.length
-			var TP=0, FP=0, TN=0, FN=0;
-			for (var i=0; i<length; i++) {
-				var training = data[i];
-				var expected = training.target;
-				var actual = api.perceive_features(training.input);
-				if (expected && actual) TP++;
-				if (!expected && actual) FP++;
-				if (expected && !actual) FN++;
-				if (!expected && !actual) TN++;
-			}
-			return {
-				TP: TP,
-				FP: FP,
-				TN: TN,
-				FN: FN,
-				Accuracy:  (TP+TN)/length,
-				Precision: TP/(TP+FP),
-				Recall:    TP/(TP+FN),
-			};
+			return success;
 		},
 
 		/**
@@ -135,7 +108,7 @@ function PerceptronAssociative(opts) {
 			}
 
 			var result = api.perceive_features(inputs)
-			data.push({input: inputs, target: expected/*, prev: result*/})
+			data.push({features: inputs, classification: expected/*, prev: result*/})
 
 			if (debug) console.log('> training ',inputs,', expecting: ',expected, ' got: ', result)
 
@@ -214,6 +187,60 @@ function PerceptronAssociative(opts) {
 				var features = inputs;
 			}
 			return api.perceive_features(features, net);
+		},
+		
+		test_start: function() {
+			test_stats = {
+				count: 0,
+				TP: 0,
+				TN: 0,
+				FP: 0,
+				FN: 0
+			};
+		},
+		
+		test_results: function() {
+			test_stats.Accuracy = (test_stats.TP+test_stats.TN)/(test_stats.count);
+			test_stats.Precision = test_stats.TP/(test_stats.TP+test_stats.FP);
+			test_stats.Recall = test_stats.TP/(test_stats.TP+test_stats.FN);
+			test_stats.F1 = 2/(1/test_stats.Recall+1/test_stats.Precision);
+			return test_stats;
+		},
+
+		test_features: function(features,expected) {
+			var actual = api.perceive_features(features);
+			test_stats.count++;
+			if (expected && actual) test_stats.TP++;
+			if (!expected && actual) test_stats.FP++;
+			if (expected && !actual) test_stats.FN++;
+			if (!expected && !actual) test_stats.TN++;
+		},
+
+		/**
+		 * Run through all the given samples, and use them for testing.
+		 * @return statistics about the test.
+		 */
+		test: function(inputs, expected) {
+			if (feature_extractor)	{
+				var features = {};
+				feature_extractor(inputs, features);
+			} else {
+				var features = inputs;
+			}
+			api.test_features(features, expected);
+		},
+
+		/**
+		 * Run through all past training samples, and use them for testing.
+		 * @return statistics about the test.
+		 */
+		test_on_train: function() {
+			api.test_start();
+			for (var i=0; i<data.length; ++i) {
+				var sample = data[i];
+				api.test_features(sample.features, sample.classification)
+			}
+			return api.test_results();
 		},
 		
 		
