@@ -10,8 +10,6 @@ var associative = require("./associative");
  *	<li>debug 
  *	<li>weights: initial weights (if not given, initialized to default_weight).
  *  <li>default_weight: default weight for a newly discovered feature (default = 0).
- *	<li>threshold: defaults to 1.
- *	<li>bias: initial weight of threshold. defaults to 1. 
  *	<li>learningrate: defaults to 0.1.
  *	<li>feature_extractor: function that converts input samples to feature arrays. If not given, the input sample itself is treated as an associative array of features.
  * 
@@ -29,12 +27,6 @@ function PerceptronAssociative(opts) {
 	var default_weight = 'default_weight' in opts
 		? opts.default_weight
 		: 0;
-	var threshold = 'threshold' in opts
-		? opts.threshold
-		: 1
-	var bias = 'bias' in opts	
-		? opts.bias 
-		: 1
 	var use_averaging = 'use_averaging' in opts
 		? opts.use_averaging
 		: false
@@ -60,14 +52,15 @@ function PerceptronAssociative(opts) {
 
 		save: function(folder) {
 			mkpath.sync(folder);
-			fs.writeFileSync(folder+"/opts.json", JSON.stringify({
-					weights: weights,
-					default_weight: default_weight,
-					threshold: threshold, 
-					learningrate: learningrate, 
-					debug: debug, 
-					feature_extractor: feature_extractor
-				},null,"\t")
+			fs.writeFileSync(folder+"/opts.json", "{\n"+
+					'\t"debug": '+debug+"\n,"+ 
+					'\t"weights": '+associative.stringify_sorted(weights, "\n\t\t")+",\n"+
+					'\t"weights_sum": '+associative.stringify_sorted(weights_sum, "\n\t\t")+",\n"+
+					'\t"default_weight": '+default_weight+",\n"+
+					'\t"use_averaging": '+use_averaging+",\n"+
+					//'\t"feature_extractor": "'+feature_extractor.toString().replace(/\n/g," ")+'",\n'+
+					'\t"learningrate": '+learningrate+"\n"+
+				"}\n"
 			);
 			fs.writeFileSync(folder+"/data.json", JSON.stringify(data,null,"\t"));
 		},
@@ -76,11 +69,23 @@ function PerceptronAssociative(opts) {
 			data = JSON.parse(fs.readFileSync(folder+"/data.json"));
 			opts = JSON.parse(fs.readFileSync(folder+"/opts.json"));
 			api.weights = weights = opts.weights;
+			weights_sum = opts.weights_sum;
 			default_weight = opts.default_weight;
-			threshold = opts.threshold;
 			learningrate = opts.learningrate;
+			use_averaging = opts.use_averaging;
 			debug = opts.debug;
-			feature_extractor = opts.feature_extractor;
+			//feature_extractor = eval(opts.feature_extractor);
+		},
+		
+		normalized_features: function (inputs) {
+			if (feature_extractor)	{
+				var features = {};
+				feature_extractor(inputs, features);
+			} else {
+				var features = inputs;
+			}
+			features['bias'] = 1;
+			return features;
 		},
 
 		/**
@@ -102,30 +107,24 @@ function PerceptronAssociative(opts) {
 		 * @param expected the classification value for that sample (0 or 1)
 		 * @return true if the input sample got its correct classification (i.e. no change made).
 		 */
-		train_features: function(inputs, expected) {
-			//if (debug) console.log('train_features: ', inputs, ' weights: ',weights);
-			for (feature in inputs) {
+		train_features: function(features, expected) {
+			for (feature in features) {
 				if (!(feature in weights)) {
 					weights[feature] = default_weight;
 				}
 			}
 
-			if (!('threshold' in weights)) {
-				weights['threshold'] = bias;
-			}
+			var result = api.perceive_features(features, /*net=*/false, weights); // always use the running 'weights' vector for training, and NOT the weights_sum!
 
-			var result = api.perceive_features(inputs, /*net=*/false, weights); // always use the running 'weights' vector for training, and NOT the weights_sum!
-			
-			data.push({features: inputs, classification: expected/*, prev: result*/})
+			data.push({features: features, classification: expected/*, prev: result*/})
 
-			if (debug) console.log('> training ',inputs,', expecting: ',expected, ' got: ', result)
+			if (debug) console.log('> training ',features,', expecting: ',expected, ' got: ', result);
 
 			if (result != expected) {
 				// Current model is incorrect - adjustment needed!
-				if (debug) console.log('> adjusting weights...', weights, inputs);
-				for (var feature in inputs) 
-					api.adjust(result, expected, inputs[feature], feature);
-				api.adjust(result, expected, threshold, 'threshold');
+				if (debug) console.log('> adjusting weights...', weights, features);
+				for (var feature in features) 
+					api.adjust(result, expected, features[feature], feature);
 				if (debug) console.log(' -> weights:', weights)
 			}
 			if (use_averaging) associative.add(weights_sum, weights);
@@ -139,13 +138,7 @@ function PerceptronAssociative(opts) {
 		 * @return true if the input sample got its correct classification (i.e. no change made).
 		 */
 		train: function(inputs, expected) {
-			if (feature_extractor)	{
-				var features = {};
-				feature_extractor(inputs, features);
-			} else {
-				var features = inputs;
-			} 
-			return api.train_features(features, expected);
+			return api.train_features(api.normalized_features(inputs), expected);
 		},
 
 
@@ -167,17 +160,9 @@ function PerceptronAssociative(opts) {
 		 * @param net if true, return the net classification value. If false [default], return 0 or 1.
 		 * @return the classification of the sample.
 		 */
-		perceive_features: function(inputs, net, weights_for_classification) {
-			var result = 0
-			for (var feature in inputs) {
-				if (feature in weights_for_classification) {
-					result += inputs[feature] * weights_for_classification[feature]
-				} else {
-					/* the sample contains a feature that was never seen in training - ignore it for now */ 
-				}
-			}
-			result += threshold * weights_for_classification['threshold']
-			if (debug) console.log("> perceive_features ",inputs," = ",result);
+		perceive_features: function(features, net, weights_for_classification) {
+			var result = associative.inner_product(features, weights_for_classification);
+			if (debug) console.log("> perceive_features ",features," = ",result);
 			return net
 				? result
 				: result > 0 ? 1 : 0
@@ -189,13 +174,7 @@ function PerceptronAssociative(opts) {
 		 * @return the classification of the sample.
 		 */
 		perceive: function(inputs, net) {
-			if (feature_extractor)	{
-				var features = {};
-				feature_extractor(inputs, features);
-			} else {
-				var features = inputs;
-			}
-			return api.perceive_features(features, net,
+			return api.perceive_features(api.normalized_features(inputs), net,
 				(use_averaging? weights_sum: weights) );
 		},
 		
@@ -207,14 +186,6 @@ function PerceptronAssociative(opts) {
 				FP: 0,
 				FN: 0
 			};
-		},
-		
-		test_results: function() {
-			test_stats.Accuracy = (test_stats.TP+test_stats.TN)/(test_stats.count);
-			test_stats.Precision = test_stats.TP/(test_stats.TP+test_stats.FP);
-			test_stats.Recall = test_stats.TP/(test_stats.TP+test_stats.FN);
-			test_stats.F1 = 2/(1/test_stats.Recall+1/test_stats.Precision);
-			return test_stats;
 		},
 
 		test_features: function(features,expected) {
@@ -232,14 +203,17 @@ function PerceptronAssociative(opts) {
 		 * @return statistics about the test.
 		 */
 		test: function(inputs, expected) {
-			if (feature_extractor)	{
-				var features = {};
-				feature_extractor(inputs, features);
-			} else {
-				var features = inputs;
-			}
-			api.test_features(features, expected);
+			api.test_features(api.normalized_features(inputs), expected);
 		},
+		
+		test_results: function() {
+			test_stats.Accuracy = (test_stats.TP+test_stats.TN)/(test_stats.count);
+			test_stats.Precision = test_stats.TP/(test_stats.TP+test_stats.FP);
+			test_stats.Recall = test_stats.TP/(test_stats.TP+test_stats.FN);
+			test_stats.F1 = 2/(1/test_stats.Recall+1/test_stats.Precision);
+			return test_stats;
+		},
+
 
 		/**
 		 * Run through all past training samples, and use them for testing.
