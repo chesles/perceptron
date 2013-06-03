@@ -1,26 +1,24 @@
 /**
- * A perceptron for recognizing textual entailment, based on BIUTEE's proofs 
+ * A perceptron for recognizing textual entailment, based on BIUTEE's proofs. 
  */
 
 var perceptron = require('../perceptron_associative')
+  , associative = require('../associative')
   , fs = require('fs');
 
 var opts = {
 		feature_extractor: function(pair, features) {
 			if (pair.task)
 				features[pair.task]=1; 
-			//console.dir(pair.proof);
+			if (pair.hypothesis_length)
+				features.inverse_hypothesis_length = 1 / pair.hypothesis_length;
 			for (var iStep=0; iStep<pair.proof.length; ++iStep) {
 				var step = pair.proof[iStep];
-				for (var feature in step) {
-					if (!(feature in features))
-						features[feature]=0;
-					features[feature] += step[feature];
-				}
+				associative.add(features, step);
 			}
-			//console.dir(features);
 		},
 		learningrate: 0.1,
+		use_averaging: true,
 		debug: 0
 };
 var rte = perceptron(opts);
@@ -28,27 +26,31 @@ var rte = perceptron(opts);
 var devpairs = JSON.parse(fs.readFileSync('rte3devproofs.json', 'utf8'));
 var testpairs = JSON.parse(fs.readFileSync('rte3testproofs.json', 'utf8'));
 
-for (var iPair=0; iPair<devpairs.length; ++iPair) {
-	var pair = devpairs[iPair];
-	var classification = (pair.decision==='YES'? 1: 0);
-	rte.train(pair, classification);
-}
+for (var iPair=0; iPair<devpairs.length; ++iPair)
+	rte.train(devpairs[iPair], devpairs[iPair].decision);
 rte.save("rte3model");
 
-rte.test_start();
-for (var iPair=0; iPair<testpairs.length; ++iPair) {
-	var pair = testpairs[iPair];
-	var classification = (pair.decision==='YES'? 1: 0);
-	rte.test(pair, classification);
-}
-console.dir(rte.test_results());
 
-console.log("after train #"+i+": ");
+console.log("\n\nafter first train: ");
+console.log("test on train data: ");
 console.dir(rte.test_on_train());
+console.log("test on test data: ");
+rte.test_start();
+for (var iPair=0; iPair<testpairs.length; ++iPair)
+	rte.test(testpairs[iPair], testpairs[iPair].decision);
+console.dir(rte.test_results());
 for (var i=1; i<=20; ++i) {
 	rte.retrain();
-	console.log("after retrain #"+i+": ");
-	console.dir(rte.test_on_train());
+	if (i==1 || i==10 || i==20) {
+		console.log("\n\nafter retrain "+i+":");
+		console.log("test on train data: ");
+		console.dir(rte.test_on_train());
+		console.log("test on test data: ");
+		rte.test_start();
+		for (var iPair=0; iPair<testpairs.length; ++iPair) 
+			rte.test(testpairs[iPair], testpairs[iPair].decision);
+		console.dir(rte.test_results());
+	}
 }
 
 
