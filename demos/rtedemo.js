@@ -28,8 +28,9 @@ var testpairs = JSON.parse(fs.readFileSync('rte3testproofs.json', 'utf8'));
 
 for (var iPair=0; iPair<devpairs.length; ++iPair)
 	rte.train(devpairs[iPair], devpairs[iPair].decision);
-rte.save("rte3model");
 
+// test save and load:
+rte.save("rte3model");
 var rte2 = perceptron(opts);
 rte2.load("rte3model");
 rte = rte2;

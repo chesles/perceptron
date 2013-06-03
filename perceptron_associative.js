@@ -18,27 +18,25 @@ function PerceptronAssociative(opts) {
 	if (this === global) return new PerceptronAssociative(opts);
 	if (!opts) opts = {}
 
-	var debug = 'debug' in opts 
-		? opts.debug 
-		: false;
-	var weights = 'weights' in opts
-		? opts.weights			 /* should be an associative array */
-		: {}
-	var default_weight = 'default_weight' in opts
-		? opts.default_weight
-		: 0;
-	var use_averaging = 'use_averaging' in opts
-		? opts.use_averaging
-		: false
-	var learningrate = 'learningrate' in opts
-		? opts.learningrate
-		: 0.1
+
+	if (!('debug' in opts)) 
+		opts.debug = false; 
+	if (!('default_weight' in opts))
+		opts.default_weight = 0;
+	if (!('use_averaging' in opts))
+		opts.use_averaging = false;
+	if (!('learningrate' in opts))
+		opts.learningrate = 0.1;
+
 	var feature_extractor = 'feature_extractor' in opts
 		? opts.feature_extractor
 		: 0;
 		
+	var weights = 'weights' in opts
+		? opts.weights			 /* should be an associative array */
+		: {}
 	var weights_sum = {};   // for averaging; see http://ciml.info/dl/v0_8/ciml-v0_8-ch03.pdf
-	if (use_averaging) associative.add(weights_sum, weights);
+	if (opts.use_averaging) associative.add(weights_sum, weights);
 
 	var fs = require('fs'), mkpath = require('mkpath');
 
@@ -53,13 +51,9 @@ function PerceptronAssociative(opts) {
 		save: function(folder) {
 			mkpath.sync(folder);
 			fs.writeFileSync(folder+"/opts.json", "{\n"+
-					'\t"debug": '+debug+"\n,"+ 
+					'\t"opts": '+JSON.stringify(opts, null, "\t")+"\n,"+ 
 					'\t"weights": '+associative.stringify_sorted(weights, "\n\t\t")+",\n"+
-					'\t"weights_sum": '+associative.stringify_sorted(weights_sum, "\n\t\t")+",\n"+
-					'\t"default_weight": '+default_weight+",\n"+
-					'\t"use_averaging": '+use_averaging+",\n"+
-					//'\t"feature_extractor": "'+feature_extractor.toString().replace(/\n/g," ")+'",\n'+
-					'\t"learningrate": '+learningrate+"\n"+
+					'\t"weights_sum": '+associative.stringify_sorted(weights_sum, "\n\t\t")+"\n"+
 				"}\n"
 			);
 			fs.writeFileSync(folder+"/data.json", JSON.stringify(data,null,"\t"));
@@ -68,13 +62,10 @@ function PerceptronAssociative(opts) {
 		load: function(folder) {
 			data = JSON.parse(fs.readFileSync(folder+"/data.json"));
 			opts = JSON.parse(fs.readFileSync(folder+"/opts.json"));
+			
 			api.weights = weights = opts.weights;
 			weights_sum = opts.weights_sum;
-			default_weight = opts.default_weight;
-			learningrate = opts.learningrate;
-			use_averaging = opts.use_averaging;
-			debug = opts.debug;
-			//feature_extractor = eval(opts.feature_extractor);
+			opts = opts.opts;
 		},
 		
 		normalized_features: function (inputs) {
@@ -110,7 +101,7 @@ function PerceptronAssociative(opts) {
 		train_features: function(features, expected) {
 			for (feature in features) {
 				if (!(feature in weights)) {
-					weights[feature] = default_weight;
+					weights[feature] = opts.default_weight;
 				}
 			}
 
@@ -118,16 +109,16 @@ function PerceptronAssociative(opts) {
 
 			data.push({features: features, classification: expected/*, prev: result*/})
 
-			if (debug) console.log('> training ',features,', expecting: ',expected, ' got: ', result);
+			if (opts.debug) console.log('> training ',features,', expecting: ',expected, ' got: ', result);
 
 			if (result != expected) {
 				// Current model is incorrect - adjustment needed!
-				if (debug) console.log('> adjusting weights...', weights, features);
+				if (opts.debug) console.log('> adjusting weights...', weights, features);
 				for (var feature in features) 
 					api.adjust(result, expected, features[feature], feature);
-				if (debug) console.log(' -> weights:', weights)
+				if (opts.debug) console.log(' -> weights:', weights)
 			}
-			if (use_averaging) associative.add(weights_sum, weights);
+			if (opts.use_averaging) associative.add(weights_sum, weights);
 			
 			return (result == expected);
 		},
@@ -143,7 +134,7 @@ function PerceptronAssociative(opts) {
 
 
 		adjust: function(result, expected, input, feature) {
-			var delta = api.delta(result, expected, input, learningrate);
+			var delta = api.delta(result, expected, input, opts.learningrate);
 			if (isNaN(delta)) throw new Error('delta is NaN!! result='+result+" expected="+expected+" input="+input+" feature="+feature);
 			weights[feature] += delta;
 			if (isNaN(weights[feature])) throw new Error('weights['+feature+'] went to NaN!! delta='+d);
@@ -162,7 +153,7 @@ function PerceptronAssociative(opts) {
 		 */
 		perceive_features: function(features, net, weights_for_classification) {
 			var result = associative.inner_product(features, weights_for_classification);
-			if (debug) console.log("> perceive_features ",features," = ",result);
+			if (opts.debug) console.log("> perceive_features ",features," = ",result);
 			return net
 				? result
 				: result > 0 ? 1 : 0
@@ -175,7 +166,7 @@ function PerceptronAssociative(opts) {
 		 */
 		perceive: function(inputs, net) {
 			return api.perceive_features(api.normalized_features(inputs), net,
-				(use_averaging? weights_sum: weights) );
+				(opts.use_averaging? weights_sum: weights) );
 		},
 		
 		test_start: function() {
@@ -190,7 +181,7 @@ function PerceptronAssociative(opts) {
 
 		test_features: function(features,expected) {
 			var actual = api.perceive_features(features, /*net=*/false, 
-				(use_averaging? weights_sum: weights) );
+				(opts.use_averaging? weights_sum: weights) );
 			test_stats.count++;
 			if (expected && actual) test_stats.TP++;
 			if (!expected && actual) test_stats.FP++;
