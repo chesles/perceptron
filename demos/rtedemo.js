@@ -17,8 +17,9 @@ var opts = {
 				associative.add(features, step);
 			}
 		},
-		learningrate: 0.1,
-		use_averaging: true,
+		learningrate: 1,
+		do_averaging: false,
+		do_normalization: true,
 		debug: 0
 };
 var rte = perceptron(opts);
@@ -33,7 +34,7 @@ for (var iPair=0; iPair<devpairs.length; ++iPair)
 rte.save("rte3model");
 var rte2 = perceptron(opts);
 rte2.load("rte3model");
-rte = rte2;
+//rte = rte2;
 
 console.log("\n\nafter first train: ");
 console.log("test on train data: ");

@@ -23,8 +23,10 @@ function PerceptronAssociative(opts) {
 		opts.debug = false; 
 	if (!('default_weight' in opts))
 		opts.default_weight = 0;
-	if (!('use_averaging' in opts))
-		opts.use_averaging = false;
+	if (!('do_averaging' in opts))
+		opts.do_averaging = false;
+	if (!('do_normalization' in opts))
+		opts.do_normalization = false;
 	if (!('learningrate' in opts))
 		opts.learningrate = 0.1;
 
@@ -35,8 +37,8 @@ function PerceptronAssociative(opts) {
 	var weights = 'weights' in opts
 		? opts.weights			 /* should be an associative array */
 		: {}
-	var weights_sum = {};   // for averaging; see http://ciml.info/dl/v0_8/ciml-v0_8-ch03.pdf
-	if (opts.use_averaging) associative.add(weights_sum, weights);
+	var weights_sum = {};   // for averaging; see http://ciml.info/dl/v0_8/ciml-v0_8-ch03.pdf . But count only weight vectors with successful predictions (Carvalho and Cohen, 2006).
+	//if (opts.do_averaging) associative.add(weights_sum, weights);
 
 	var fs = require('fs'), mkpath = require('mkpath');
 
@@ -76,6 +78,7 @@ function PerceptronAssociative(opts) {
 				var features = inputs;
 			}
 			features['bias'] = 1;
+			if (opts.do_normalization) associative.normalize_sum_of_values_to_1(features);
 			return features;
 		},
 
@@ -117,8 +120,9 @@ function PerceptronAssociative(opts) {
 				for (var feature in features) 
 					api.adjust(result, expected, features[feature], feature);
 				if (opts.debug) console.log(' -> weights:', weights)
+			} else {
+				if (opts.do_averaging) associative.add(weights_sum, weights);
 			}
-			if (opts.use_averaging) associative.add(weights_sum, weights);
 			
 			return (result == expected);
 		},
@@ -166,7 +170,7 @@ function PerceptronAssociative(opts) {
 		 */
 		perceive: function(inputs, net) {
 			return api.perceive_features(api.normalized_features(inputs), net,
-				(opts.use_averaging? weights_sum: weights) );
+				(opts.do_averaging? weights_sum: weights) );
 		},
 		
 		test_start: function() {
@@ -181,7 +185,7 @@ function PerceptronAssociative(opts) {
 
 		test_features: function(features,expected) {
 			var actual = api.perceive_features(features, /*net=*/false, 
-				(opts.use_averaging? weights_sum: weights) );
+				(opts.do_averaging? weights_sum: weights) );
 			test_stats.count++;
 			if (expected && actual) test_stats.TP++;
 			if (!expected && actual) test_stats.FP++;

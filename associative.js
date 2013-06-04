@@ -21,13 +21,24 @@ api.add  = function(target, source) {
 /**
  * multiply one associative array by another.
  * @param target [input and output]
- * @param source [input]: will be multiplied to target.
+ * @param source [input]: target will be multiplied by it.
  */
 api.multiply  = function(target, source) {
 	for (var feature in source) {
 		if (!(feature in target))
 			target[feature]=1;
 		target[feature] *= source[feature];
+	}
+}
+
+/**
+ * multiply an associative array by a scalar.
+ * @param target [input and output]
+ * @param source [input]: target will be multiplied by it.
+ */
+api.multiply_scalar  = function(target, source) {
+	for (var feature in target) {
+		target[feature] *= source;
 	}
 }
 
@@ -47,6 +58,47 @@ api.inner_product = function(features, weights) {
 			}
 	}
 	return result;
+}
+
+api.sum_of_values = function(weights) {
+	var result = 0;
+	for (var feature in weights)
+		result += weights[feature];
+	return result;
+}
+
+api.sum_of_absolute_values = function(weights) {
+	var result = 0;
+	for (var feature in weights)
+		result += Math.abs(weights[feature]);
+	return result;
+}
+
+api.sum_of_square_values = function(weights) {
+	var result = 0;
+	for (var feature in weights)
+		result += Math.pow(weights[feature],2);
+	return result;
+}
+
+/**
+ * Normalize the given associative array, such that the sum of values is 1.
+ * Unless, of course, the current sum is 0, in which case, nothing is done. 
+ */
+api.normalize_sum_of_values_to_1 = function(features) {
+	var sum = api.sum_of_absolute_values(features);
+	if (sum!=0)
+		api.multiply_scalar(features, 1/sum);
+}
+
+/**
+ * Normalize the given associative array, such that the sum of squares of the values is 1.
+ * Unless, of course, the current sum is 0, in which case, nothing is done. 
+ */
+api.normalize_sum_of_squares_to_1 = function(features) {
+	var sum = api.sum_of_square_values(features);
+	if (sum!=0)
+		api.multiply_scalar(features, 1/Math.sqrt(sum));
 }
 
 
