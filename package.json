@@ -16,9 +16,12 @@
   "directories": {
     "test": "tests"
   },
-  "dependencies": {},
+  "dependencies": {
+    "mkpath": "~0.1.0",
+    "should": "~1.2.2"
+  },
   "devDependencies": {
-    "specify": "~1.1.2"
+    "specify": "*"
   },
   "keywords": [
     "machine learning",
