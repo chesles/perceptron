@@ -13,13 +13,9 @@ function Perceptron(opts) {
     ? opts.threshold
     : 1
 
-  var learningrate;
-  if (!('learningrate' in opts)) {
-    learningrate = 0.1
-  }
-  else {
-    learningrate = opts.learningrate
-  }
+  var learningrate = 'learningrate' in opts
+    ? opts.learningrate
+    : 0.1
 
   var data = []
 
